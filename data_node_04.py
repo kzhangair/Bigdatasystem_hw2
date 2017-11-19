@@ -8,7 +8,7 @@ HEAD_STRUCT = '128sII'
 info_size = struct.calcsize(HEAD_STRUCT)
 buffer_size = 1024
 #addr = '219.223.181.197'
-addr = 'localhost'
+addr = '192.168.0.104'
 port = 12306
 
 #Create a TCP/IP socket
@@ -36,7 +36,6 @@ while True :
             count = 0
             print 'Begin to send file...'
             for slice in fopen:
-                time.sleep(0.1)
                 connection.send(slice)
             print >>sys.stderr, 'sent...'
             fopen.close()

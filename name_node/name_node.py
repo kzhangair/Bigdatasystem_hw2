@@ -1,7 +1,6 @@
 import socket
 import sys
 import struct
-import time
 
 HEAD_STRUCT = '128sII'
 
@@ -28,7 +27,6 @@ def DownloadFile(addr, port, file_name):
         while one_slice :
             fopen.write(one_slice)
             fopen.flush()
-            time.sleep(0.1)
             one_slice = sock.recv(buffer_size)
             if not one_slice:
                 print >>sys.stderr, 'one_slice empty!!!'
@@ -101,4 +99,33 @@ def DFSSave(file_name, local_path):
     print 'File Save Complete!'
 
 def DFSLoad(file_name, local_path):
-    
+    record_f = open('dfs_name_record', 'r')
+    line = record_f.readline()
+    chunk_num = -1
+    while line :
+        strList = line.split()
+        if strList[0] == file_name :
+            chunk_num = int(strList[1])
+            break
+        else :
+            line = record_f.readline()
+    if chunk_num == -1:
+        print "No Such File in DFS!"
+        return
+    print "Chunk Number of %s is %d" % (file_name, chunk_num)
+    fw = open(local_path, 'wb')
+    for i in range(1, chunk_num+1):
+        download_file_name = file_name + "_" + str(i)
+        data_node_id = i%3
+        if data_node_id == 0:
+            DownloadFile('thumm02', 12306, download_file_name)
+        elif data_node_id == 1:
+            DownloadFile('thumm04', 12306, download_file_name)
+        elif data_node_id == 2:
+            DownloadFile('thumm03', 12306, download_file_name)
+        fo = open(download_file_name, 'rb')
+        for data in fo:
+            fw.write(data)
+        fo.close()
+    fw.close()
+    print 'File load Complete!'
