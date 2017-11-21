@@ -1,21 +1,23 @@
 import socket
 import sys
 import struct
+import os
+import time
 
 HEAD_STRUCT = '128sII'
 
 def DownloadFile(addr, port, file_name):
-    buffer_size = 1024
-
-    #Create a TCP/IP socket
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    #Connect the socket to the port where the server is listening
-    server_address = (addr, port)
-    print >>sys.stderr, 'connecting to %s port %s' % server_address
-    sock.connect(server_address)
-
     try:
+        buffer_size = 1024
+
+        #Create a TCP/IP socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        #Connect the socket to the port where the server is listening
+        server_address = (addr, port)
+        print >>sys.stderr, 'connecting to %s port %s' % server_address
+        sock.connect(server_address)
+
         #Send file_name to data_node
         print >>sys.stderr, 'Get %s from data_node' % file_name
         sent_info = struct.pack(HEAD_STRUCT, file_name, len(file_name), 0) #DownloadFile = 0
@@ -30,23 +32,23 @@ def DownloadFile(addr, port, file_name):
             one_slice = sock.recv(buffer_size)
             if not one_slice:
                 print >>sys.stderr, 'one_slice empty!!!'
-    except socket.errno, e:
-            print "Socket error: %s" % str(e)
-    finally:
         fopen.close()
         print >>sys.stderr, 'closing socket'
-    sock.close()
+        sock.close()
+        return True
+    except:
+        print  "There is some error!"
+        return False
 
 def UploadFile(addr, port, file_name):
-    #Create a TCP/IP socket
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    #Connect the socket to the port where the server is listening
-    server_address = (addr, port)
-    print >>sys.stderr, 'connecting to %s port %s' % server_address
-    sock.connect(server_address)
-
     try:
+        #Create a TCP/IP socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        #Connect the socket to the port where the server is listening
+        server_address = (addr, port)
+        print >>sys.stderr, 'connecting to %s port %s' % server_address
+        sock.connect(server_address)
         # Send file_name to data_node
         print >> sys.stderr, 'Upload %s to data_node' % file_name
         sent_info = struct.pack(HEAD_STRUCT, file_name, len(file_name), 1)
@@ -57,14 +59,37 @@ def UploadFile(addr, port, file_name):
         for slice in fopen:
             sock.send(slice)
         print >> sys.stderr, 'sent...'
-    except socket.errno, e:
-        print "Socket error: %s" % str(e)
-    finally:
         fopen.close()
         print >>sys.stderr, 'closing socket'
-    sock.close()
+        sock.close()
+        return True
+    except:
+        print  "There is some error!"
+        return False
+
+def isFileNameInRecord(file_name):
+    record_f = open('dfs_name_record', 'r')
+    line = record_f.readline()
+    chunk_num = -1
+    while line:
+        strList = line.split()
+        if strList[0] == file_name:
+            chunk_num = int(strList[1])
+            break
+        else:
+            line = record_f.readline()
+    record_f.close()
+    if chunk_num == -1 :
+        return False, chunk_num
+    else :
+        return True, chunk_num
 
 def DFSSave(file_name, local_path):
+    start = time.clock()
+    isRecorded, chunk_num = isFileNameInRecord(file_name)
+    if isRecorded:
+        print "%s already in DFS!" % file_name
+        return
     record_f = open('dfs_name_record', 'a')
     record_f.write(file_name+' ')
     fr = open(local_path, 'rb')
@@ -96,20 +121,15 @@ def DFSSave(file_name, local_path):
         elif data_node_id == 2:
             UploadFile('thumm03', 12306, upload_file_name)
             UploadFile('thumm04', 12306, upload_file_name)
+        os.remove(upload_file_name)
     print 'File Save Complete!'
+    elapsed = (time.clock() - start)
+    print "DFSSave Time used: %d seconds" % elapsed
 
 def DFSLoad(file_name, local_path):
-    record_f = open('dfs_name_record', 'r')
-    line = record_f.readline()
-    chunk_num = -1
-    while line :
-        strList = line.split()
-        if strList[0] == file_name :
-            chunk_num = int(strList[1])
-            break
-        else :
-            line = record_f.readline()
-    if chunk_num == -1:
+    start = time.clock()
+    isRecorded, chunk_num = isFileNameInRecord(file_name)
+    if not isRecorded:
         print "No Such File in DFS!"
         return
     print "Chunk Number of %s is %d" % (file_name, chunk_num)
@@ -118,14 +138,23 @@ def DFSLoad(file_name, local_path):
         download_file_name = file_name + "_" + str(i)
         data_node_id = i%3
         if data_node_id == 0:
-            DownloadFile('thumm02', 12306, download_file_name)
+            result = DownloadFile('thumm02', 12306, download_file_name)
+            if not result:
+                DownloadFile('thumm03', 12306, download_file_name)
         elif data_node_id == 1:
-            DownloadFile('thumm04', 12306, download_file_name)
+            result = DownloadFile('thumm04', 12306, download_file_name)
+            if not result:
+                DownloadFile('thumm02', 12306, download_file_name)
         elif data_node_id == 2:
-            DownloadFile('thumm03', 12306, download_file_name)
+            result = DownloadFile('thumm03', 12306, download_file_name)
+            if not result:
+                DownloadFile('thumm04', 12306, download_file_name)
         fo = open(download_file_name, 'rb')
         for data in fo:
             fw.write(data)
         fo.close()
+        os.remove(download_file_name)
     fw.close()
     print 'File load Complete!'
+    elapsed = (time.clock() - start)
+    print "DFSLoad Time used: %d seconds" % elapsed

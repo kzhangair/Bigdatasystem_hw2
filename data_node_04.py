@@ -3,7 +3,6 @@
 import socket
 import sys
 import struct
-import time
 HEAD_STRUCT = '128sII'
 info_size = struct.calcsize(HEAD_STRUCT)
 buffer_size = 1024
