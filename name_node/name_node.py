@@ -68,9 +68,12 @@ def UploadFile(addr, port, file_name):
         return False
 
 def isFileNameInRecord(file_name):
-    record_f = open('dfs_name_record', 'r')
-    line = record_f.readline()
     chunk_num = -1
+    try:
+        record_f = open('dfs_name_record', 'r')
+    except:
+        return False, chunk_num
+    line = record_f.readline()
     while line:
         strList = line.split()
         if strList[0] == file_name:
